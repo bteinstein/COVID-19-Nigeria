@@ -1,0 +1,92 @@
+```{r}
+Geop_zone = "South South"
+t_col = map_col_df$color[map_col_df$Geopolitical_Zone == Geop_zone]
+  region_tot_case = map_col_df$region_tot_case[map_col_df$Geopolitical_Zone == Geop_zone]
+  title_txt = glue("{Geop_zone} ({format(region_tot_case,big.mark = ',',scientific = F)} Cases)")
+  
+make_barplot_region = function(Geop_zone){
+   ng_maxday %>% 
+    select(States, Confirmed_Cases, Active, Recovered, Death, Geopolitical_Zone) %>% 
+    filter(Geopolitical_Zone == Geop_zone) %>% 
+    pivot_longer(cols = c(Active,Recovered, Death), names_to = "case_type",values_to='no_persons') %>% 
+    mutate(case_type = factor(case_type, levels = c('Confirmed_Cases', 'Active','Recovered', 'Death'))) %>% 
+    ggplot(aes(x=fct_reorder(States, Confirmed_Cases), y=no_persons, fill = case_type)) +
+    geom_col() +
+    scale_fill_manual(values = col_range, guide = guide_legend(direction = 'horizontal')) + 
+    labs(x=NULL, y="Number of Persons", title = ) +
+    coord_flip()  
+}
+
+pp = make_barplot_region("South South")
+
+pp
+
+fig_title = plot_annotation(
+      title = title_txt,
+      theme = theme(
+      plot.title = element_textbox_simple(
+        colour = 'black', fill = 'white',#,linewidth = 1.4, 
+        size = 20,family = 'fredoka',#lineheight = 0.7,
+        padding = unit(c(0, 0, 0, 0), "pt"),
+        margin = unit(c(rep(-1), 4), "lines"), 
+        r = unit(0, "pt")
+      ) ) ) 
+
+pp + theme_bw() +
+  theme(
+    legend.position = 'none',
+     panel.background = element_rect(fill = "#2B303D", color = "#2B303D"),
+     plot.background = element_rect(fill = "#2B303D", color = "#2B303D"),
+    axis.title = element_blank(),
+    text = element_text(color = "white",size = 8),
+    axis.text= element_text(color = "white", size =8 )
+  ) +
+  fig_title
+
+```
+
+```{r}
+pp + theme_bw() +
+  theme(
+    legend.position = 'none',
+     panel.background = element_rect(fill = "#2B303D", color = "#2B303D"),
+     plot.background = element_rect(fill = "#2B303D", color = "#2B303D"),
+    axis.title = element_blank(),
+    text = element_text(color = "white",size = 8),
+    axis.text= element_text(color = "white", size =8 )
+  ) +
+  fig_title
+
+```
+
+
+```{r}
+
+
+
+
+cust_theme_base <-theme_bw() + theme(
+        plot.background = element_rect(fill = "#2B303D", color = "#2B303D"),
+        panel.background = element_rect(fill = "#2B303D", color = "#2B303D"), 
+        panel.grid.major = element_line(color = "#8A8A8A"),
+        panel.grid.minor = element_line(color = "#8A8A8A"),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(size =20,vjust = 0.5),
+        plot.title.position = "plot",
+        axis.title = element_blank(),
+        text = element_text(color = "white",size = 8),
+        axis.text= element_text(color = "white", size =8 ), 
+
+  )
+
+cust_theme +
+    theme(legend.position = 'none', 
+          axis.text = element_text(size=11,face = 'bold'),
+          plot.title.position = 'plot',
+          plot.background = element_rect(fill = "#2B303D", color = "#2B303D"), 
+          plot.title = element_text(face = 'bold', size = 22, colour = t_col,hjust = 0.5,margin = unit(x = c(0.5,0,0.5,0), units = 'lines')),
+          plot.margin = margin(t = 0,r = -1,b = -10,l = -1,unit = 'lines')
+          ) 
+```
+

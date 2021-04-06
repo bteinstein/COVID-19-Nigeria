@@ -1,0 +1,154 @@
+---
+title: "100 Days of COVID-19 in Nigeria - Map 01"
+author: "Babatunde Adebayo"
+date: "6/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Map of Nigeria showing the distribution of cummalative COVID-19 Confirmed Cases by Geopolitical Zones
+
+## Packages
+```{r packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(sf)
+library(ggtext)
+library(showtext)
+#library(here)
+```
+
+## Fonts
+```{r fonts}
+font_add_google("Poppins", "poppins") # Annotation
+showtext_auto() # Use showtext
+```
+
+## Load Data
+```{r load_data, message=FALSE, warning=FALSE}
+# df_daily_case_by_state_region <- read_csv("../data/df_nigeria_MaxDay.csv")
+data_MaxDay <- read_csv("../data/df_nigeria_MaxDay.csv") %>% 
+                         select(Geopolitical_Zone,States,Confirmed_Cases) 
+
+## Adding Custom Color per region
+# SW_color = colorRampPalette(c('#B6AFAF','#DB0F00'))(6)  #
+SW_color = colorRampPalette(c('#B6AFAF','#f8766d'))(6)  #
+NW_color = colorRampPalette(c('#2D3E32','#00ba38'))(7)   
+NC_color = colorRampPalette(c('#343B46','#619cff'))(7)  
+NE_color = colorRampPalette(c('#304F4B','#00DBBE'))(6)  
+SS_color = colorRampPalette(c('#554453','#f564e3'))(6)  
+SE_color = colorRampPalette(c('#2B291D','#b79f00'))(5) 
+
+data_MaxDay <- bind_rows(
+  data_MaxDay %>% filter(Geopolitical_Zone == 'South West') %>% 
+    arrange(Confirmed_Cases) %>%   mutate(color = SW_color),
+  
+  data_MaxDay %>% filter(Geopolitical_Zone == 'North West') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = NW_color),
+  
+  data_MaxDay %>% filter(Geopolitical_Zone == 'North Central') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = NC_color),
+  
+  data_MaxDay %>% filter(Geopolitical_Zone == 'North East') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = NE_color),
+  
+  data_MaxDay %>% filter(Geopolitical_Zone == 'South South') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = SS_color),
+  
+  data_MaxDay %>% filter(Geopolitical_Zone == 'South East') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = SE_color)
+)
+
+# data_MaxDay
+```
+ 
+
+
+## Load Nigeria Map
+Data source: https://data.humdata.org/dataset/nigeria-admin-level-0-1-and-2-administrative-boundaries
+```{r message=FALSE, warning=FALSE, include=FALSE}
+nig_shp <- st_read("./data/Nigeria_OCHA/Admin_1/nga_polbnda_adm1_1m_salb.shp") 
+
+nig_shp <- nig_shp %>% 
+  select(ADM1_NAME ,geometry) %>% 
+  rename(States = ADM1_NAME) %>% 
+    mutate(States = case_when(
+      States == 'Akwa lbom' ~ 'Akwa Ibom',
+      States == 'Federal Capital Territory' ~ 'FCT',
+      TRUE ~ States
+    )) %>%  
+  mutate(centroid = st_centroid(geometry)) %>%
+  mutate(
+    lon = st_coordinates(.$centroid)[,1],
+    lat = st_coordinates(.$centroid)[,2]
+  )
+
+
+# Together
+map_data <- full_join(nig_shp, data_MaxDay)
+# names(map_data)
+```
+
+
+
+
+## Plot 1
+```{r theme}
+theme_custom_blck <- theme_void()+
+          theme(
+            panel.background = element_rect(fill='black'),
+            plot.background =  element_rect(fill='black'),
+            plot.margin=unit(c(0,-10,0,-10),"mm"),
+            legend.position = 'none'
+          )
+```
+
+# 
+```{r plot1, fig.width = 9, fig.height = 6.9} 
+p_map <- 
+          map_data %>%   
+          ggplot()+ 
+          geom_sf(aes(fill = color), color='#FFFFFF', alpha=0.6) + # border color 
+          scale_fill_identity() +
+          geom_sf_text(aes(x = lon, y=lat-2,label=States), 
+          size =3, fontface='bold', color="grey10")+
+           labs(x=NULL,y=NULL)  + 
+          expand_limits(x=c(1,1)) +
+          theme_custom_blck
+        
+        # map_bg
+p_map
+```
+
+## Plot 2
+```{r}
+
+
+```
+
+
+```{r nigeria region , fig.width = 9, fig.height = 6.9}
+p1 = nig_plot_data %>%   
+  ggplot()+ 
+  geom_sf(aes(fill = colours), alpha=0.6,color='grey50') +
+  geom_sf_text(aes(label=States), size =2.5, color='grey99', fontface='bold') 
+
+p1 + scale_y_continuous(expand = c(0.0, 0.0)) + scale_x_continuous(expand = c(0, 0)) 
+
+p1 +
+    theme(
+      plot.background = element_rect(fill='black'),
+      panel.background = element_rect(fill='black'),
+      panel.grid = element_blank(),
+      legend.position = 'none',
+      axis.title = element_blank(),
+      axis.text = element_blank(), 
+      plot.margin = margin(0, 0, 0, 0) #0, -89, 0, 0
+    )
+  # theme_custom_black
+p1
+```
+
+
+

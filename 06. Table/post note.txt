@@ -1,0 +1,3 @@
+Summary table of COVID-19 in Nigeria, made with #ggplot #Rstats.
+
+Inspiration from @geokaramanis

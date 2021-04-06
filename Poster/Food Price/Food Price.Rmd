@@ -1,0 +1,162 @@
+```{r}
+  library(tidyverse)
+  library(viridis)
+  library(RColorBrewer)
+```
+
+Load Data
+
+```{r}
+fprice <- readxl::read_excel("./SELECTED_FOOD_(AUGUST 2020).xlsx", sheet = "NATIONAL") %>% 
+  select(-c(`...46`,`...49`,`MoM`,YoY,Lowest,Highest)) %>%
+  pivot_longer(names_to = "date", cols = 2:45) %>% 
+  mutate(date = as.Date(as.numeric(date), origin = "1899-12-30")) %>% 
+  rename("FoodItem" = 'ItemLabels', "price" = "value")
+
+fprice
+
+distinct(fprice, FoodItem)
+fsubset <- tibble::tribble(
+                                    ~FoodItem,                 ~FoodItem_,
+                     "Agric eggs medium size",          "Egg (Med. Size)",
+                     "Beans brown,sold loose",                    "Beans",
+                               "Beef Bone in",           "Beef (Bone In)",
+                              "Beef,boneless",                     "Beef (Boneless)",
+                          "Bread sliced 500g",      "Bread (Sliced 500G)",
+                        "Bread unsliced 500g",    "Bread (Unsliced 500G)",
+                        "Broken Rice (Ofada)",       "Local Rice (Ofada)",
+                     "Catfish (obokun) fresh",          "Catfish (Fresh)",
+                             "Catfish :dried",          "Catfish (Dried)",
+                             "Catfish Smoked",         "Catfish (Smoked)",
+                               "Chicken Feet",             "Chicken Feet",
+                              "Chicken Wings",            "Chicken Wings",
+                         "Dried Fish Sardine",          "Sardine (Dried)",
+         "Evaporated tinned milk(peak), 170g",   "Evaporated Milk (170g)",
+                             "Frozen chicken",           "Frozen chicken",
+                      "Gari white,sold loose",             "Gari (White)",
+                     "Gari yellow,sold loose",            "Gari (Yellow)",
+    "Groundnut oil: 1 bottle, specify bottle",     "Groundnut (1 Bottle)",
+                               "Iced Sardine",           "Sardine (Iced)",
+                               "Irish potato",             "Irish potato",
+                          "Mackerel : frozen",   "Mackerel Fish (Frozen)",
+               "Maize grain white sold loose",            "Maize (White)",
+              "Maize grain yellow sold loose",           "Maize (Yellow)",
+                        # "Mudfish (aro) fresh",          "Mudfish (Fresh)",
+                            # "Mudfish : dried",          "Mudfish (Dried)",
+                                 "Onion bulb",               "Onion bulb",
+          "Palm oil: 1 bottle,specify bottle",      "Palm Oil (1 Bottle)",
+                             "Plantain(ripe)",          "Plantain (Ripe)",
+                           "Plantain(unripe)",         "Plantain(Unripe)",
+                      "Rice local sold loose",               "Local Rice",
+      "Rice,imported high quality sold loose",          "Rice (Imported)",
+                               "Sweet potato",             "Sweet potato",
+                 "Tilapia fish (epiya) fresh",     "Tilapia fish (Fresh)",
+                               "Titus:frozen",           "Titus (Frozen)",
+                                     "Tomato",                   "Tomato",
+      "Vegetable oil:1 bottle,specify bottle", "Vegetable Oil (1 bottle)",
+  "Wheat flour: prepacked (golden penny 2kg)",        "Wheat flour (2kg)",
+                                  "Yam tuber",                "Yam tuber"
+  )
+
+fprice <- left_join(fsubset, fprice) %>% 
+  select(FoodItem_, date, price) %>%
+  rename("FoodItem" = "FoodItem_")
+```
+
+### Theme
+
+```{r}
+Polar_Theme2 <- theme_minimal() +
+  theme(
+    strip.text = element_text(face = 'bold', hjust = 0.5, vjust = 0.5),
+    strip.background = element_rect(fill = 'gray55', color='Black',size = 1),
+    legend.position = "none",
+    axis.title = element_text(face='bold', colour = 'gray55' ), # Modify this to keep x or y axis text
+    axis.text = element_text(size =7, colour = 'gray85'), 
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "black", colour = NA), 
+    plot.title = element_text(hjust = 0.5, size = 24, family  = "Garamond"),
+    plot.subtitle = element_text(hjust = 0.5, family  = "Garamond"),
+    plot.caption = element_text(hjust = 0.5, family = "Garamond")
+  ) 
+
+
+library(scales) 
+fprice %>%
+  filter(date >= as.Date('2019-01-01'))%>%
+  ggplot(aes(x = date, y = price)) +
+  geom_line(color = 'gray60', size = 1) +
+  geom_line(data = filter(fprice,date >= as.Date('2020-03-01')), 
+            aes(x = date, y = price), color = '#7c3b37ff', size = 1) +
+  # scale_y_continuous(breaks= scales::comma_format(big.mark = ","))  +
+  scale_x_date(date_labels = "%b-%y",) +
+  labs(x = NULL, y = "Price") +
+  Polar_Theme2 +
+  facet_wrap( ~ FoodItem, ncol=4, scales = 'free_y')
+
+
+ggsave(filename = "./Poster/png/nig_foodprice_plot_V4.png", device = 'png',dpi = 320)
+```
+
+```{r}
+as.Date('2019-03-01')
+```
+
+#### Paper
+
+-   <div>
+
+```{r}
+
+    Polar_Theme2 <- theme_minimal() +
+      theme(
+        strip.text = element_text(face = 'bold', hjust = 0.5, vjust = 0.5),
+        strip.background = element_rect(fill = 'gray80', color='Black',size = 0.5),
+        legend.position = "none",
+        axis.title = element_tdext(face='bold', colour = 'gray55' ), # Modify this to keep x or y axis text
+        axis.text = element_text(size =7),#, colour = 'gray85'), 
+        panel.grid = element_blank(),
+        # plot.background = element_rect(fill = "black", colour = NA), 
+        plot.title = element_text(hjust = 0.5, size = 24, family  = "Garamond"),
+        plot.subtitle = element_text(hjust = 0.5, family  = "Garamond"),
+        plot.caption = element_text(hjust = 0.5, family = "Garamond")
+      ) 
+
+    fprice %>%
+      # filter(date >= as.Date('2019-01-01') and fprice,date < as.Date('2020-03-01'))%>%
+      filter(date >= as.Date('2019-01-01') & date < as.Date('2020-03-01'))%>%
+      ggplot(aes(x = date, y = price)) +
+      geom_line(color = 'gray60', size = 1,linetype = 3) +
+      geom_line(data = filter(fprice,date >= as.Date('2020-03-01')), 
+                aes(x = date, y = price), color = '#7c3b37ff', size = 1) +
+      # scale_y_continuous(breaks= scales::comma_format(big.mark = ","))  +
+      scale_x_date(date_labels = "%b-%y",) +
+      labs(x = NULL, y = "Price") +
+      Polar_Theme2 +
+      facet_wrap( ~ FoodItem, ncol=4, scales = 'free_y')
+
+
+    ggsave(filename = "./Poster/png/paper/nig_foodprice_plot_pV2.png", device = 'png',dpi = 320, height = 8, width = 7)
+
+
+    ```
+
+    </div>
+
+### Top 5 States 
+
+```{r}
+fprice %>%
+  # filter(date >= as.Date('2019-01-01') and fprice,date < as.Date('2020-03-01'))%>%
+  filter(date < as.Date('2020-03-01'), 
+         States %in% c("Lagos",   "FCT",     "Oyo" ,    "Edo"  ,   "Plateau"))%>%
+  ggplot(aes(x = date, y = price)) +
+  geom_line(color = 'gray60', size = 1,linetype = 3) +
+  geom_line(data = filter(fprice,date >= as.Date('2020-03-01')), 
+            aes(x = date, y = price), color = '#7c3b37ff', size = 1) +
+  # scale_y_continuous(breaks= scales::comma_format(big.mark = ","))  +
+  scale_x_date(date_labels = "%b-%y",) +
+  labs(x = NULL, y = "Price") +
+  Polar_Theme2 +
+  facet_wrap( ~ FoodItem, ncol=4, scales = 'free_y')
+```

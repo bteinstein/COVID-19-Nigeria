@@ -1,0 +1,79 @@
+## Color Selection
+```{r}
+data_20200605 <- df_daily_case_by_state_region %>%
+                        filter(Date == sort(unique(Date))[100] ) %>% 
+                         select(Geopolitical_Zone,States,Confirmed_Cases) 
+
+SW_color = colorRampPalette(c('#B6AFAF','#f8766d'))(6)  
+NW_color = colorRampPalette(c('#2D3E32','#00ba38'))(7)   
+NC_color = colorRampPalette(c('#343B46','#619cff'))(7)  
+NE_color = colorRampPalette(c('#304F4B','#00DBBE'))(6)  
+SS_color = colorRampPalette(c('#554453','#f564e3'))(6)  
+SE_color = colorRampPalette(c('#2B291D','#b79f00'))(5) 
+
+map_data_20200605 <- bind_rows(
+  data_20200605 %>% filter(Geopolitical_Zone == 'South West') %>% 
+    arrange(Confirmed_Cases) %>%   mutate(color = SW_color),
+  
+  data_20200605 %>% filter(Geopolitical_Zone == 'North West') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = NW_color),
+  
+  data_20200605 %>% filter(Geopolitical_Zone == 'North Central') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = NC_color),
+  
+  data_20200605 %>% filter(Geopolitical_Zone == 'North East') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = NE_color),
+  
+  data_20200605 %>% filter(Geopolitical_Zone == 'South South') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = SS_color),
+  
+  data_20200605 %>% filter(Geopolitical_Zone == 'South East') %>% 
+  arrange(Confirmed_Cases) %>%   mutate(color = SE_color)
+)
+
+
+head(map_data_20200605)
+```
+
+```{r}
+SW_color = colorRampPalette(c('#B6AFAF','#f8766d'))(6)  #B3B2B2
+NW_color = colorRampPalette(c('#2D3E32','#00ba38'))(7)   #556259#202C24
+NC_color = colorRampPalette(c('#343B46','#619cff'))(7)  
+NE_color = colorRampPalette(c('#304F4B','#00DBBE'))(6)  
+SS_color = colorRampPalette(c('#554453','#f564e3'))(6)  
+SE_color = colorRampPalette(c('#2B291D','#b79f00'))(5)  
+```
+
+
+
+
+```{r}
+{
+n=6
+SW_color = colorRampPalette(c('#B6AFAF','#F75B50'))(n)  #f8766d
+NW_color = colorRampPalette(c('#2D3E32','#00ba38'))(n)   #556259#202C24
+NC_color = colorRampPalette(c('#343B46','#619cff'))(n)  
+NE_color = colorRampPalette(c('#304F4B','#00DBBE'))(n)  
+SS_color = colorRampPalette(c('#554453','#f564e3'))(n)  
+SE_color = colorRampPalette(c('#2B291D','#b79f00'))(n)  
+
+pall = SW_color
+tibble( x = 1:n, y = 4, f = LETTERS[1:n]) %>% 
+  ggplot(aes(x,y,  color = f)) +
+  geom_point(size = 9) + 
+  geom_text(aes(label=f), size =3.5,color='#FFFFFF', fontface='bold') + 
+  scale_color_manual(element_blank(),
+                    values = pall, drop=FALSE) +
+  guides(color = guide_legend(title.position = "top", 
+                             title.hjust = 0.5, nrow = 1,
+                             label.position = "top")) +
+  theme_dark()+
+  theme(panel.background = element_rect(fill='black'),
+        plot.background = element_rect(fill='black'),
+        panel.grid = element_blank(),
+        legend.position = 'top',
+        legend.background = element_blank(),
+        legend.text = element_text(color='white'))
+}
+```
+

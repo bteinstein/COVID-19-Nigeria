@@ -1,0 +1,272 @@
+---
+title: "Map 03: Regional Summary of COVID-19 in Nigeria"
+author: "Babatunde Adebayo"
+date: "08/01/2020"
+output: html_document
+---
+
+
+Resources
+1. https://github.com/jkaupp/tidytuesdays/blob/master/2020/week30/R/analysis.R
+2. https://github.com/toebR/Tidy-Tuesday/tree/master/victims_domestic_violence_CH_2019
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse) # Data Manipulation and Plotting
+library(sf) # Map
+library(RColorBrewer ) # Color 
+library(grid)
+# library(gridtext)
+library(here)
+library(glue)
+library(ggtext)
+library(patchwork)
+```
+
+### Theme
+```{r theme}
+cust_theme_base <-theme_bw() + theme(
+        plot.background = element_rect(fill = "#2B303D", color = "#2B303D"),
+        panel.background = element_rect(fill = "#2B303D", color = "#2B303D"), 
+        panel.grid.major = element_line(color = "#8A8A8A"),
+        panel.grid.minor = element_line(color = "#8A8A8A"),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(size =20,vjust = 0.5),
+        plot.title.position = "plot",
+        axis.title = element_blank(),
+        text = element_text(color = "white",size = 8),
+        axis.text= element_text(color = "white", size =8 ), 
+  )
+
+
+cust_theme_density <- cust_theme_base + theme(
+        strip.background = element_rect(fill = 'gray30', color=NA),
+        strip.text = element_text(face = 'bold', colour ='white',vjust = 1, size =9),
+        strip.placement = "outside"
+  )
+
+cust_theme_map = cust_theme_base +
+  theme(
+    legend.position = 'none', #legend.position = 'bottom',
+    legend.direction = 'horizontal',
+    panel.grid.major  = element_blank(),
+    panel.grid.minor  = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    # plot.margin = margin(0, 0, 0, 0)
+    plot.margin = margin(t = 1,r = -30,b = 1,l = -30,unit = 'cm')
+  )
+```
+
+### Data
+```{r message=FALSE, warning=FALSE}
+ng_main_data <- readr::read_csv('../data/daily_cases_by_state_region.csv')
+
+# Subset the last cummulative information
+ng_maxday <- ng_main_data %>% 
+                  filter(Date == max(Date)) 
+```
+
+ [1] "States"              "Date"                "Confirmed_Cases"     "Active"              "Recovered"          
+ [6] "Death"               "DailyConfirmedCases" "DailyRecoveryCases"  "DailyDeaths"         "Confirmed_Cases_cum"
+[11] "Geopolitical_Zone"   "zone_avg"  
+
+## Big Map
+```{r}
+summary_gp <-
+  ng_maxday %>% 
+    select(States, Confirmed_Cases, Active, Recovered, Death, Geopolitical_Zone) %>% 
+    group_by(Geopolitical_Zone) %>% 
+    summarise(region_tot_case = sum(Confirmed_Cases)) %>% 
+    arrange(-region_tot_case)
+
+summary_gp
+# summary_gp$Geopolitical_Zone
+
+```
+```{r message=FALSE, warning=FALSE, include=FALSE}
+nig_shp <- st_read("./data/Nigeria_OCHA/Admin_1/nga_polbnda_adm1_1m_salb.shp")
+
+nig_shp <- nig_shp %>% 
+  select(ADM1_NAME ,geometry) %>% 
+  rename(States = ADM1_NAME) %>% 
+    mutate(States = case_when(
+      States == 'Akwa lbom' ~ 'Akwa Ibom',
+      States == 'Federal Capital Territory' ~ 'FCT',
+      TRUE ~ States
+    )) %>%  
+  mutate(centroid = st_centroid(geometry)) %>%
+  mutate(
+    lon = st_coordinates(.$centroid)[,1],
+    lat = st_coordinates(.$centroid)[,2]
+  ) 
+
+# Joining the shape file and summary data
+map_data <- full_join(nig_shp, 
+                      ng_maxday %>% 
+                      select(States, Confirmed_Cases, Active, Recovered, Death, Geopolitical_Zone)%>% 
+                        mutate(Geopolitical_Zone = factor(Geopolitical_Zone, levels = c(summary_gp$Geopolitical_Zone))))
+```
+
+```{r fig.width = 9, fig.height = 6.9}
+map_col = c(colorRampPalette(brewer.pal(7,"YlOrRd"))(7)[c(2:7)])[6:1]
+map_col_df = tibble(Geopolitical_Zone = c(summary_gp$Geopolitical_Zone),
+                    color = map_col) %>% 
+  left_join(summary_gp)
+
+  plt_map <- 
+  map_data %>%
+  ggplot() +
+  geom_sf(color=NA, fill='white') + 
+  geom_sf(aes(fill = Geopolitical_Zone), color = "white", 
+          alpha = 0.65,  size = 0.3) +
+  geom_sf_text(aes(label=States), size =2.5, fontface='bold', color='gray20') +
+  scale_fill_manual(values = map_col) +
+  cust_theme_map + 
+  scale_y_continuous(expand = c(0.1, 0.1)) + #scale_x_continuous(expand = c(0, 0)) +
+  ggsave(here("02. Maps", "image", glue("plt_map_large.png")), width = 10, height = 10)
+
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_map.png")), plot = plt_map, width = 10, height = 10)
+```
+
+
+## Density Plots by Regions
+```{r Demo-AreaPlot, fig.height=7, fig.width=8}
+
+cust_theme_density <- cust_theme_base + theme(
+        strip.background = element_rect(fill = 'gray30', color=NA),
+        strip.text = element_text(face = 'bold', colour ='white',vjust = 1, size =9.5),
+        strip.placement = "outside", 
+        plot.title.position = 'plot'
+  )
+
+
+make_areaplot_region <- function(Geop_zone){
+  t_col = map_col_df$color[map_col_df$Geopolitical_Zone == Geop_zone]
+  region_tot_case = map_col_df$region_tot_case[map_col_df$Geopolitical_Zone == Geop_zone]
+  title_txt = glue("{Geop_zone} ({format(region_tot_case,big.mark = ',',scientific = F)} Cases)")
+  ng_main_data %>% 
+  filter(Geopolitical_Zone == Geop_zone) %>% 
+  ggplot() +
+  geom_area(aes(x=Date,y=Confirmed_Cases), alpha = .5, fill='cyan') +
+  geom_area(aes(x=Date,y=Active), alpha = .5, fill='orange') + 
+  geom_area(aes(x=Date,y=Recovered), alpha = .7, fill='palegreen2') + 
+  geom_area(aes(x=Date,y=Death), alpha = .7, fill='orangered') + 
+  facet_wrap(~States,ncol = 3,scales = 'free') +
+  labs(y="Number of Persons",x="Date", title = title_txt) + 
+  cust_theme_density +
+    theme(
+      plot.title = element_text(face = 'bold', size = 22,colour = t_col,vjust = 0.5,margin = unit(x = c(0,0,1,1.2), units = 'lines'))
+    )
+}
+
+
+make_areaplot_region('South South') 
+
+
+plt_area_sw = make_areaplot_region('South West') 
+plt_area_se = make_areaplot_region('South East')
+plt_area_ss = make_areaplot_region('South South')
+plt_area_nw = make_areaplot_region('North West')
+plt_area_ne = make_areaplot_region('North East')
+plt_area_nc = make_areaplot_region('North Central')
+
+
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_area_sw.png")), plot = plt_area_sw, width = 7, height = 5)
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_area_se.png")), plot = plt_area_se, width = 7, height = 5)
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_area_ss.png")), plot = plt_area_ss, width = 7, height = 5)
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_area_nw.png")), plot = plt_area_nw, width = 7, height = 5)
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_area_ne.png")), plot = plt_area_ne, width = 7, height = 5)
+# ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_area_nc.png")), plot = plt_area_nc, width = 7, height = 5)
+
+```
+
+## Bar Plot
+```{r Bar-Plot}
+col_range = c(colorRampPalette(brewer.pal(7,"YlOrRd"))(7)[c(2:3,6)])
+
+make_barplot_region = function(Geop_zone){
+  t_col = map_col_df$color[map_col_df$Geopolitical_Zone == Geop_zone]
+  region_tot_case = map_col_df$region_tot_case[map_col_df$Geopolitical_Zone == Geop_zone]
+  title_txt = glue("{Geop_zone} ({format(region_tot_case,big.mark = ',',scientific = F)} Cases)")
+  
+  
+  pp <- ng_maxday %>% 
+    select(States, Confirmed_Cases, Active, Recovered, Death, Geopolitical_Zone) %>% 
+    filter(Geopolitical_Zone == Geop_zone) %>% 
+    pivot_longer(cols = c(Active,Recovered, Death), names_to = "case_type",values_to='no_persons') %>% 
+    mutate(case_type = factor(case_type, levels = c('Confirmed_Cases', 'Active','Recovered', 'Death'))) %>% 
+    ggplot(aes(x=fct_reorder(States, Confirmed_Cases), y=no_persons, fill = case_type)) +
+    geom_col() +
+    scale_fill_manual(values = col_range, guide = guide_legend(direction = 'horizontal')) + 
+    labs(x=NULL, y="Number of Persons", title = ) +
+    coord_flip() +
+     cust_theme +
+    theme(
+          axis.text = element_text(size=11,face = 'bold'),
+          plot.title.position = 'plot',
+          plot.background = element_rect(fill = "#2B303D", color = "#2B303D"), 
+          plot.title = element_text(face = 'bold', size = 22, colour = t_col,hjust = 0.5,margin = unit(x = c(0.5,0,0.5,0), units = 'lines')),
+          plot.margin = margin(t = 0,r = -1,b = -10,l = -1,unit = 'lines'),
+          legend.position = 'bottom',
+  legend.key.size = unit(10,'pt'),
+  legend.margin = margin(t=0),
+  legend.spacing = unit(10,'lines'),
+  legend.text = element_text(size=11)
+          ) 
+    
+   pp_t <- plot_annotation(
+      title = title_txt,
+      theme = theme(
+      plot.title = element_textbox_simple(hjust = 0.5,vjust = 0.5,
+        colour = t_col, fill = NULL,#,linewidth = 1.4, 
+        size = 20,face='bold',family = 'fredoka',#lineheight = 0.7,
+        padding = unit(c(rep(0.4,4)), "lines"),
+        margin = unit(c(0.4, 0, 0.4, 0), "lines"), 
+        r = unit(0, "pt")
+      ) ) ) 
+    
+   
+   pp+pp_t& theme(plot.background = element_rect(fill = "#2B303D", color = "#2B303D"))
+}
+ 
+make_barplot_region("South East") + theme(
+  legend.position = 'bottom',
+  legend.key.size = unit(10,'pt'),
+  legend.margin = margin(t=0),
+  legend.spacing = unit(10,'lines'),
+  legend.text = element_text(size=11)
+)
+
+
+plt_bar_sw = make_barplot_region("South West")
+plt_bar_se = make_barplot_region("South East")
+plt_bar_ss = make_barplot_region("South South")
+plt_bar_nw = make_barplot_region("North West")
+plt_bar_ne = make_barplot_region("North East")
+plt_bar_nc = make_barplot_region("North Central")
+
+
+ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_bar_sw.png")), plot = plt_bar_sw, width = 7, height = 5)
+ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_bar_se.png")), plot = plt_bar_se, width = 7, height = 5)
+ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_bar_ss.png")), plot = plt_bar_ss, width = 7, height = 5)
+ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_bar_nw.png")), plot = plt_bar_nw, width = 7, height = 5)
+ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_bar_ne.png")), plot = plt_bar_ne, width = 7, height = 5)
+ggsave(here("02. Maps", "image", "03 - Summary","Use Case", glue("plt_bar_nc.png")), plot = plt_bar_nc, width = 7, height = 5)
+
+```
+
+
+## Merge 01
+```{r}
+#plt_map
+plt_map + plt_area_nc +plt_area_ne
+```
+
+## Lines 
+draw_lines()
+
+
+## Labels
+

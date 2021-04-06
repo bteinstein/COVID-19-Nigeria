@@ -1,0 +1,146 @@
+## GeoZoneal Summary of Covid  as at August 31st 2020
+
+```{r}
+library(tidyverse)
+library(ggsci)
+library(glue)
+library(ggrepel)
+library(ggtext)
+```
+
+### Fonts
+
+```{r}
+library(showtext)
+font_add_google("Poppins", "Poppins")
+font_add_google("Roboto Mono", "Roboto Mono")
+showtext_auto()
+
+theme_set(theme_light(base_family = "Poppins"))
+```
+
+### Load Data
+
+```{r}
+aug_covid <- readxl::read_xlsx("../../data/NG_Aug31_Covid.xlsx")
+head(aug_covid)
+```
+
+### Data Aggregates
+```{r}
+# Regional Median
+regional_med_df <- aug_covid %>% 
+  group_by(GeoZone) %>%
+  summarise(GeoZone_MedCC = round(median(ConfirmedCases)))
+
+#National Median Confirmed Cases
+national_medianCC <- 
+  aug_covid %>%
+  summarize(med = round(median(ConfirmedCases, na.rm = T))) %>%
+  pull(med)
+
+#National Average Confirmed Cases
+national_avgCC <- 
+  aug_covid %>%
+  summarize(avg = round(mean(ConfirmedCases, na.rm = T))) %>%
+  pull(avg)
+
+regional_avg_df <- aug_covid %>% 
+  group_by(GeoZone) %>%
+  summarise(GeoZone_AvgCC = round(mean(ConfirmedCases)))
+
+
+
+national_medianCC
+national_avgCC
+```
+```{r}
+data_summary <- aug_covid %>% select(States, ConfirmedCases) %>% mutate(state_pct = round((ConfirmedCases/sum(ConfirmedCases))*100,1))
+lagos_pct = filter(data_summary, States=="Lagos") %>% pull(state_pct)
+kano_pct = filter(data_summary, States=="Kano") %>% pull(state_pct)
+ogun_pct = filter(data_summary, States=="Ogun") %>% pull(state_pct)
+oyo_pct = filter(data_summary, States=="Oyo") %>% pull(state_pct)
+```
+
+## Data Prep
+```{r}
+df_sorted <- 
+  aug_covid %>%
+  left_join(regional_med_df) %>%
+  left_join(regional_avg_df) %>% 
+  mutate(GeoZone = fct_reorder(GeoZone, -GeoZone_MedCC)) %>% 
+                    mutate(state_labels = ifelse(ConfirmedCases >= national_medianCC, 
+                                 glue("{States} ({ConfirmedCases})"),"")) 
+
+# df_sorted
+
+```
+
+
+###  Plot
+```{r}
+COLOURS = c("#800000FF", "#767676FF", "#FFA319FF", "#8A9045FF", "#155F83FF", "#C16622FF")
+color_df = tibble(GeoZone = c("South West","North West", "North Central",
+                                        "North East","South South" ,"South East"),
+                  colours = COLOURS)
+
+
+df_sorted <- 
+  aug_covid%>% 
+  group_by(GeoZone) %>% 
+  mutate(region_sum = sum(ConfirmedCases)) %>% 
+  ungroup() %>%
+  left_join(regional_med_df) %>%
+  left_join(regional_avg_df) %>% 
+  mutate(GeoZone = fct_reorder(GeoZone, -GeoZone_MedCC))%>% 
+  left_join(color_df) %>% 
+  mutate(state_labels = ifelse(ConfirmedCases >= national_medianCC, 
+                               glue("{States} ({ConfirmedCases})"),"")) %>% 
+  mutate(x_axis_name = glue("<span style='color:{colours}'><b>{gsub('','',GeoZone)}</span><br><span style='font-size:20pt;color:{colours}'><b>({region_sum})</b></span>"),
+       x_axis_name = fct_reorder(x_axis_name, -region_sum))  
+
+
+pos <- position_jitter( width=0.3, seed = 2020)
+p7 <- ggplot(df_sorted, aes(x = x_axis_name, y = ConfirmedCases, color = colours)) +
+  coord_flip(clip = 'off')+
+  scale_y_continuous(limits = c(-100,19000),breaks = c(NA,seq(1000,19000,by=5000))) +
+  labs(x = NULL, y = "Cumulative Number of Confirmed Cases") +
+  geom_segment(
+    aes(x = x_axis_name, xend = x_axis_name, y = national_medianCC, yend = GeoZone_MedCC), size = 0.8 )+
+  geom_hline(aes(yintercept = national_avgCC), color = "#5b0281", size = 0.3, linetype = 'longdash') + # Nationwide Average Confirmed Cases
+  geom_hline(aes(yintercept = national_medianCC), color = "#686D36", size = 0.3, linetype = 'twodash') + # Nationwide Median Confirmed+
+  geom_text_repel(aes(label=state_labels), position = pos,hjust = 1,
+                  segment.alpha=0, alpha = 1, fontface='bold', size=7.2) +
+  geom_jitter(size = 3.5, alpha = 0.25, position = pos) +
+  stat_summary(fun = median, geom = "point", size = 2.5, alpha = 0.8) +
+  scale_color_identity() +
+  theme_light(base_family = "Poppins") +
+  theme(
+    legend.position = "none",
+    axis.title = element_text(size = 20),
+    axis.text.x = element_text(family = "Roboto Mono", size = 25),
+    plot.caption = element_text(size = 9, color = "gray50"),
+    panel.grid = element_blank(),plot.margin = unit(c(1.2,1,0,1), "lines"),
+    axis.text.y = element_markdown(size = 25,vjust = 0.5,hjust = 0.5, lineheight = 0.4)
+  ) 
+ggsave(p7, filename = "./Poster/png/paper/nig_zoneCovidSummary_plot_pV2.png", device = 'png', height = 5, width = 7.5, dpi = 320)
+
+
+
+```
+
+Top 5 States
+```{r}
+aug_covid %>% 
+  arrange(-ConfirmedCases) %>% 
+  slice_head(n=5) %>% pull(States)
+```
+
+
+Bottom 5 States
+```{r}
+aug_covid %>% 
+  arrange(-ConfirmedCases) %>% 
+  slice_tail(n=5) %>% pull(States)
+```
+
